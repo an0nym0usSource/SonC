@@ -11,8 +11,8 @@ public abstract class MovingObject implements HasPoint {
 	int status;
 	double heading;
 	double speed;
-	double x;
-	double y;
+	double x = 0;
+	double y = 0;
 	
 	/**
 	 * Initialize a moving object with given status, heading and speed
@@ -43,7 +43,10 @@ public abstract class MovingObject implements HasPoint {
 	
 	public double getHeading() { return this.heading; }
 	
-	void setHeading(double heading) { this.heading = heading; }
+	void setHeading(double heading) { 
+		if(heading > (2*Math.PI) || heading < 0) this.heading = normalizeAngle(heading);
+		else this.heading = heading;
+	}
 
 	public double getSpeed() { return this.speed; }
 	
@@ -75,20 +78,32 @@ public abstract class MovingObject implements HasPoint {
 		double y1 = this.getY();
 		double y2 = other.getY();
 		
-		return Math.sqrt(Math.sqrt(x2-x1) + Math.sqrt(y2-y1));
+		return Math.sqrt(Math.pow((x2-x1), 2) + Math.pow((y2-y1), 2));
 	}
 
 	/**
-	 * Angle from this moving object to another given as parameter. Angles are in radians in the range [0,2*PI: 0 is right, PI/2 is down, PI is left and 3/2*PI is up
+	 * Angle from this moving object to another given as parameter. 
+	 * Angles are in radians in the range [0,2*PI: 0 is right, PI/2 is down, PI is left and 3/2*PI is up
 	 * @param other - moving object
 	 * @return angle to other object or NaN if some coordinates is not defined
 	 */
 	
 	protected double headingTo(MovingObject other) {
-		double dy = other.getY() - this.getY();
-		double dx = other.getX() - this.getX();
+		double otherY = other.getY();
+		double otherX = other.getX();
+		double cx = this.getX();
+		double cy = this.getY();
 		
-		return Math.atan(dy/dx);
+		//if((otherY == -1) || (otherX == -1) || (cx == -1) || (cy == -1)) return Double.NaN;
+		//coordinates are initialized with 0
+		
+		double dy = otherY - cy;
+		double dx = otherX - cx;
+		
+		double angle = Math.atan2(dy , dx);
+		
+		if(angle > (2*Math.PI) || angle < 0) return normalizeAngle(angle);
+		return angle;
 	}
 
 	/**
@@ -96,8 +111,8 @@ public abstract class MovingObject implements HasPoint {
 	 */
 	
 	final void updatePosition() {
-		this.x = this.x + this.speed * Math.sin((2*Math.PI) - this.heading);
-		this.y = this.y + this.speed * Math.sin((2*Math.PI) - this.heading);
+		this.x = this.getX() + this.speed * Math.cos((2*Math.PI) - this.heading);
+		this.y = this.getY() + (-1) * this.speed * Math.sin((2*Math.PI) - this.heading);
 	}
 	
 	/**
@@ -106,13 +121,17 @@ public abstract class MovingObject implements HasPoint {
 	 */
 	
 	final void doRotate(double delta) {
-		// nao pode passar o MaxRotation
 		double newAngle = 0;
 		
-		newAngle = this.heading + delta;
+		newAngle = getHeading() + delta;
 		
-		if(newAngle > (2*Math.PI) || newAngle < 0) this.heading = normalizeAngle(newAngle);
-		else this.heading = newAngle;
+		double maxRotation = getMaxRotation();
+		
+		if(newAngle > maxRotation) setHeading(maxRotation);
+		else {
+			if(newAngle > (2*Math.PI) || newAngle < 0) setHeading(normalizeAngle(newAngle));
+			else setHeading(newAngle);
+		}
 	}
 	
 	/**
@@ -124,14 +143,13 @@ public abstract class MovingObject implements HasPoint {
 	 * @param delta - angle variation (in radians)
 	 */
 	
-	//final void doChangeSpeed(double delta) {	} ??
-	final void doChangeSpeed(double speed) { 
+	final void doChangeSpeed(double delta) { 
 		boolean flagNegative = false;
-		double newSpeed = this.speed + speed;
+		double newSpeed = this.speed + delta;
 		
 		if(newSpeed < 0) flagNegative = true;
 		
-		double absValueVariation = Math.abs(speed - newSpeed);
+		double absValueVariation = Math.abs(delta - this.speed);
 		double absValueChangedSpeed = Math.abs(newSpeed);
 		
 		// limited by the MaxSpeedChange
@@ -153,7 +171,7 @@ public abstract class MovingObject implements HasPoint {
 	 * Override this method to define the movement of this object. Concrete ships will need to do it to implement their strategies
 	 */
 
-	//void move() {}
+	void move() {}
 	
 	/**
 	 * Change status to reflect damage inflicted by given moving object
